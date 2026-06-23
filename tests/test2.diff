@@ -1,0 +1,54 @@
+diff --git a/src/mathUtils.ts b/src/mathUtils.ts
+index e69de29..b3a1a24 100644
+--- a/src/mathUtils.ts
++++ b/src/mathUtils.ts
+@@ -1,3 +1,11 @@
+ export function add(a: number, b: number): number {
+   return a + b;
+ }
++
++export function multiply(a: number, b: number): number {
++  if (typeof a !== 'number' || typeof b !== 'number') {
++    throw new TypeError('Arguments must be numbers');
++  }
++  return a * b;
++}
+diff --git a/src/__tests__/mathUtils.test.ts b/src/__tests__/mathUtils.test.ts
+index a1b2c3d..e4f5g6h 100644
+--- a/src/__tests__/mathUtils.test.ts
++++ b/src/__tests__/mathUtils.test.ts
+@@ -1,7 +1,17 @@
+-import { add } from '../mathUtils';
++import { add, multiply } from '../mathUtils';
+ 
+ describe('mathUtils', () => {
+   it('should add two numbers correctly', () => {
+     expect(add(2, 3)).toBe(5);
+   });
++
++  it('should multiply two numbers correctly', () => {
++    expect(multiply(2, 3)).toBe(6);
++  });
++
++  it('should throw an error if arguments are not numbers', () => {
++    // @ts-ignore
++    expect(() => multiply('2', 3)).toThrow(TypeError);
++  });
+ });
+diff --git a/README.md b/README.md
+index 8b36848..d12c34f 100644
+--- a/README.md
++++ b/README.md
+@@ -4,6 +4,13 @@ This project contains core mathematical utilities for the application.
+ 
+ ## Features
+ 
+ - **Addition**: Easily sum up pairs of numbers.
++- **Multiplication**: Multiply numbers safely with built-in type validation.
++
++## Usage
++
++```typescript
++import { multiply } from './src/mathUtils';
++console.log(multiply(3, 4)); // Outputs: 12
++```

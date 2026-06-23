@@ -1,0 +1,114 @@
+diff --git a/src/10-critic-loop.ts b/src/10-critic-loop.ts
+new file mode 100644
+index 0000000..a92d2f4
+--- /dev/null
++++ b/src/10-critic-loop.ts
+@@ -0,0 +1,107 @@
++import Groq from "groq-sdk";
++
++
++const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
++
++type CriticVerdict = {
++  approved: boolean;
++  feedback: string;
++}
++
++// writer — produces or revises a short piece of content
++async function writeDraft(topic: string, previousDraft?: string, feedback?: string): Promise<string> {
++  // if previousDraft + feedback exist, revise based on feedback
++  // otherwise, write a fresh draft
++  const instruction = previousDraft
++  ? `Revise this draft to fix the issues below. The draft MUST be under 50 words, MUST mention a specific price, and MUST NOT use the words 'amazing' or 'revolutionary'. Count your words before responding.
++
++    Previous draft: ${previousDraft}
++
++    Critic's feedback: ${feedback}
++
++    Write only the revised draft, nothing else.`
++    : `Write a report. Be enthusiastic and use superlatives.\n\nTopic: ${topic}`;
++
++  const response = await groq.chat.completions.create({
++      model: "llama-3.3-70b-versatile",
++      messages: [
++        { role: "system", content: `
++            You are writing a Product Description.\n\n${instruction}
++        ` },
++      ],
++    });
++    
++    let msg = await response.choices[0]?.message?.content;
++    return msg ?? "";
++}
++
++// critic — reviews the draft against specific criteria
++async function critiqueDraft(topic: string, draft: string): Promise<CriticVerdict> {
++  // judge prompt: does this draft meet quality criteria? (you decide the criteria)
++  // return JSON: { approved: boolean, feedback: string }
++  const wordCheck = checkWordCount(draft, 50);
++
++  const response = await groq.chat.completions.create({
++      model: "llama-3.3-70b-versatile",
++      messages: [
++        { role: "system", content: `
++            You are a critic judge reviewing a product description.
++
++            Criteria (you only judge these — word count is already checked separately):
++            - must mention a specific price
++            - must not use the words 'amazing' or 'revolutionary'
++
++            Return raw JSON only:
++            {
++            "approved": <boolean>,
++            "feedback": "<specific feedback>"
++            }
++
++            Draft: ${draft}
++        ` },
++      ],
++    });
++    
++    let msg = await response.choices[0]?.message?.content;
++    const verdict: CriticVerdict = JSON.parse(msg ?? "{}");
++
++    // combine deterministic check with LLM judgment
++    if (!wordCheck.pass) {
++        verdict.approved = false;
++        verdict.feedback = `Word count is ${wordCheck.count}, must be ≤50. ${verdict.feedback}`;
++    }
++
++    return verdict;
++}
++
++function checkWordCount(draft: string, max: number): { pass: boolean; count: number } {
++  const count = draft.trim().split(/\s+/).length;
++  return { pass: count <= max, count };
++}
++
++// the self-correction loop
++async function writeWithSelfCorrection(topic: string): Promise<{draft:string;approved:boolean}> {
++  let draft = await writeDraft(topic);
++  let attempts = 1;
++  let approved = false;
++  const MAX_ATTEMPTS = 3;
++
++  while (attempts < MAX_ATTEMPTS) {
++    const verdict = await critiqueDraft(topic, draft);
++    console.log(`Attempt ${attempts} — approved: ${verdict.approved}`);
++    console.log(`Feedback: ${verdict.feedback}`);
++
++    if (verdict.approved) {approved=true;break;}
++
++    draft = await writeDraft(topic, draft, verdict.feedback);
++    attempts++;
++  }
++
++  return {draft,approved};
++}
++
++
++const query = "write a 3-sentence product description for flying jacket.";
++const answer = await writeWithSelfCorrection(query);
++
++console.log(answer.approved?answer.draft:"");
+\ No newline at end of file
